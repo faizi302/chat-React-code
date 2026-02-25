@@ -1,5 +1,4 @@
 // MainLayout.jsx
-// Only needed if you use React Router. Otherwise all layout lives in App.jsx.
 import React from "react";
 import { Outlet } from "react-router-dom";
 import Header from "./Header";
@@ -14,34 +13,45 @@ export default function MainLayout({
   sidebarOpen, onToggleSidebar,
 }) {
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden", background: "#09091a" }}>
+    <div className="flex flex-col h-screen overflow-hidden bg-[#09091a]">
       <Header
-        currentUser={currentUser} activeRoom={activeRoom}
-        onJoinClick={onJoinClick} onLeaveClick={onLeaveClick}
-        onEditClick={onEditClick} onLogout={onLogout}
+        currentUser={currentUser}
+        activeRoom={activeRoom}
+        onJoinClick={onJoinClick}
+        onLeaveClick={onLeaveClick}
+        onEditClick={onEditClick}
+        onLogout={onLogout}
         onShowMembers={onShowMembers}
         onToggleSidebar={onToggleSidebar}
         sidebarOpen={sidebarOpen}
       />
 
-      <div style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
+      <div className="flex flex-1  overflow-hidden ">
+        {/* Mobile overlay — clicking closes sidebar */}
         {sidebarOpen && (
           <div
             onClick={onToggleSidebar}
-            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", zIndex: 20 }}
-            className="md:hidden"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-20 md:hidden"
           />
         )}
 
+        {/* Sidebar — absolute on mobile so it overlays, relative on desktop */}
         <Sidebar
-          allUsers={allUsers} onlineMap={onlineMap} usersMap={usersMap} rooms={rooms}
-          onSelectUser={onSelectUser} onSelectRoom={onSelectRoom}
-          activeRoomId={activeRoomId} currentUserId={currentUserId}
-          onEditGroup={onEditGroup} isOpen={sidebarOpen}
+          allUsers={allUsers}
+          onlineMap={onlineMap}
+          usersMap={usersMap}
+          rooms={rooms}
+          onSelectUser={onSelectUser}
+          onSelectRoom={onSelectRoom}
+          activeRoomId={activeRoomId}
+          currentUserId={currentUserId}
+          onEditGroup={onEditGroup}
+          isOpen={sidebarOpen}
         />
 
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
-          <Outlet />
+        {/* Main content — always takes full width on mobile */}
+        <div className="flex flex-col flex-1 overflow-hidden  ">
+          <Outlet  />
         </div>
       </div>
 

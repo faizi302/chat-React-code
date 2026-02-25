@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { login } from "../api/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
+//  .... logo image
+import logo from "../assets/mk logo.png"; // adjust path if needed
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -87,19 +89,13 @@ export default function Login() {
           textAlign: "center",
         }}>
           {/* Logo */}
-          <div style={{
-            width: 80, height: 80, borderRadius: 24, margin: "0 auto 32px",
-            background: "linear-gradient(135deg, #7c3aed, #06b6d4)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 36,
-            boxShadow: "0 0 60px rgba(124,58,237,0.5)",
-          }}>⚡</div>
+          <img src={logo} />
           <h1 style={{
             fontSize: 48, fontWeight: 800, margin: "0 0 16px",
             background: "linear-gradient(135deg, #a78bfa, #67e8f9, #f9a8d4)",
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
             lineHeight: 1.1,
-          }}>StandardChat</h1>
+          }}>Start Chatting</h1>
           <p style={{ color: "rgba(167,139,250,0.6)", fontSize: 18, lineHeight: 1.7, maxWidth: 360 }}>
             Real-time messaging with end-to-end encryption. Connect with your team seamlessly.
           </p>
@@ -138,20 +134,12 @@ export default function Login() {
           }}>
             {/* Header */}
             <div style={{ textAlign: "center", marginBottom: 36 }}>
-              <div style={{
-                width: 56, height: 56, borderRadius: 16, margin: "0 auto 20px",
-                background: "linear-gradient(135deg, #7c3aed, #06b6d4)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 26, boxShadow: "0 0 30px rgba(124,58,237,0.4)",
-              }}>⚡</div>
+              <img src={logo} />
               <h2 style={{
                 margin: "0 0 8px", fontSize: 28, fontWeight: 700,
                 background: "linear-gradient(135deg, #f0f0ff, #a78bfa)",
                 WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
               }}>Welcome back</h2>
-              <p style={{ color: "rgba(167,139,250,0.5)", fontSize: 14, margin: 0 }}>
-                Sign in to continue chatting
-              </p>
             </div>
 
             {/* Error message */}
@@ -250,7 +238,7 @@ export default function Login() {
             {/* Footer link */}
             <p style={{ textAlign: "center", marginTop: 24, fontSize: 14, color: "rgba(167,139,250,0.5)" }}>
               Don't have an account?{" "}
-              <Link to="/signup" style={{ color: "#a78bfa", fontWeight: 600, textDecoration: "none" }}>
+              <Link to="/login" style={{ color: "#a78bfa", fontWeight: 600, textDecoration: "none" }}>
                 Create one →
               </Link>
             </p>

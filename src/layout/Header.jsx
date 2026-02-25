@@ -1,166 +1,168 @@
-// layout/Header.jsx
-import React, { useState , useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Menu, X, Plus, LogOut, Edit, Zap, ChevronDown, Shield } from "lucide-react";
+import { Menu, X, Plus, LogOut, Edit, ChevronDown, Shield } from "lucide-react";
+import logo from "../assets/mk logo.png";
 
-export default function Header({
-  currentUser,
-  onJoinClick,
-  onEditClick,
-  onLogout,
-  onToggleSidebar,
-  sidebarOpen,
-}) {
-  const [showMenu, setShowMenu] = useState(false);
-  const navigate = useNavigate();
-  const menuRef = useRef(null);
+export default function Header({ currentUser, onJoinClick, onEditClick, onLogout, onToggleSidebar, sidebarOpen }) {
+  const [showMenu, setShowMenu]         = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const navigate  = useNavigate();
+  const menuRef   = useRef(null);
+  const mobileRef = useRef(null);
 
+  // Close desktop dropdown on outside click
   useEffect(() => {
-  const handleClickOutside = (event) => {
-    if (menuRef.current && !menuRef.current.contains(event.target)) {
-      setShowMenu(false);
-    }
-  };
+    const h = e => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setShowMenu(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
 
-  document.addEventListener("mousedown", handleClickOutside);
+  // Close mobile menu on outside click
+  useEffect(() => {
+    const h = e => {
+      if (mobileRef.current && !mobileRef.current.contains(e.target)) setShowMobileMenu(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
 
-  return () => {
-    document.removeEventListener("mousedown", handleClickOutside);
-  };
-}, []);
+  const isAdmin = currentUser?.role === "admin";
 
   return (
-    <header
-      style={{
-        height: 64,
-        padding: "0 20px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        flexShrink: 0,
-        position: "relative",
-        zIndex: 40,
-        background: "linear-gradient(110deg, #0f0c29 0%, #1a1040 50%, #24243e 100%)",
-        borderBottom: "1px solid rgba(124,58,237,0.2)",
-        boxShadow: "0 4px 30px rgba(0,0,0,0.5)",
-      }}
-    >
-      {/* Bottom glow line */}
-      <div style={{
-        position: "absolute", bottom: 0, left: 0, right: 0, height: 2,
-        background: "linear-gradient(90deg, #7c3aed, #06b6d4, #ec4899, #7c3aed)",
-        opacity: 0.6,
-      }} />
+    <header className="header">
+      <div className="header-glow" />
 
-      {/* LEFT */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <button onClick={onToggleSidebar} style={iconBtn} title="Toggle sidebar">
+      {/* Left: sidebar toggle + logo */}
+      <div className="header-left">
+        <button onClick={onToggleSidebar} className="icon-btn" aria-label="Toggle sidebar">
           {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: "linear-gradient(135deg,#7c3aed,#06b6d4)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 0 16px rgba(124,58,237,0.5)", flexShrink: 0,
-          }}>
-            <Zap size={18} color="white" />
-          </div>
-          <span style={{
-            fontWeight: 800, fontSize: 18,
-            background: "linear-gradient(90deg,#a78bfa,#67e8f9)",
-            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-            letterSpacing: "-0.02em",
-            fontFamily: "'DM Sans', sans-serif",
-          }} className="hidden sm:block">
-            StandardChat
-          </span>
-        </div>
+        <img
+          src={logo}
+          alt="Logo"
+          style={{ height: 36, width: "auto", objectFit: "contain" }}
+        />
       </div>
 
-      {/* RIGHT */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        {/* New group button */}
-        <button
-          onClick={onJoinClick}
-          style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "8px 14px", borderRadius: 10, cursor: "pointer",
-            background: "rgba(124,58,237,0.18)",
-            border: "1px solid rgba(124,58,237,0.35)",
-            color: "#a78bfa", fontSize: 13, fontWeight: 600,
-            transition: "all 0.2s",
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = "rgba(124,58,237,0.32)"}
-          onMouseLeave={e => e.currentTarget.style.background = "rgba(124,58,237,0.18)"}
-        >
-          <Plus size={16} />
-          <span className="hidden sm:inline">New Group</span>
-        </button>
+      {/* Right — desktop: full controls */}
+      <div className="header-right">
 
-        {/* User avatar / dropdown */}
+        {/* New Group — desktop only, admin only */}
+        {isAdmin && (
+          <button onClick={onJoinClick} className="btn-new-group desktopNav">
+            <Plus size={16} />
+            <span>New Group</span>
+          </button>
+        )}
+
+        {/* Desktop user menu */}
         {currentUser && (
-          <div style={{ position: "relative" }}>
-            <button
-              onClick={() => setShowMenu(v => !v)}
-              style={{
-                display: "flex", alignItems: "center", gap: 8,
-                padding: "5px 10px", borderRadius: 10, cursor: "pointer",
-                background: "rgba(255,255,255,0.05)",
-                border: "1px solid rgba(124,58,237,0.2)",
-                transition: "all 0.2s",
-              }}
-            >
-              {currentUser.profileImage ? (
-                <img
-                  src={currentUser.profileImage}
-                  alt={currentUser.nickName || currentUser.name}
-                  style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(124,58,237,0.5)", flexShrink: 0 }}
-                />
-              ) : (
-                <div style={{
-                  width: 32, height: 32, borderRadius: "50%",
-                  background: "linear-gradient(135deg,#7c3aed,#06b6d4)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontWeight: 700, fontSize: 14, color: "white", flexShrink: 0,
-                }}>
-                  {(currentUser.nickName || currentUser.name)?.[0]?.toUpperCase() || "?"}
-                </div>
-              )}
-              <span className="hidden sm:block" style={{ fontSize: 13, fontWeight: 500, color: "#e0e0ff", maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ position: "relative" }} className="desktopNav" ref={menuRef}>
+            <button onClick={() => setShowMenu(v => !v)} className="user-menu-btn">
+              {currentUser.profileImage
+                ? <img src={currentUser.profileImage} alt={currentUser.nickName || currentUser.name} className="avatar-sm" />
+                : <div className="avatar-fallback">{(currentUser.nickName || currentUser.name)?.[0]?.toUpperCase() || "?"}</div>
+              }
+              <span style={{ fontSize: 13, fontWeight: 500, color: "#e0e0ff", maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {currentUser.nickName || currentUser.name}
               </span>
-              {currentUser.role === "admin" && (
-                <span style={{ fontSize: 9, padding: "2px 5px", borderRadius: 4, background: "rgba(236,72,153,0.2)", color: "#f9a8d4", fontWeight: 700, border: "1px solid rgba(236,72,153,0.3)" }}>
-                  ADMIN
-                </span>
-              )}
+              {isAdmin && <span className="badge-admin">ADMIN</span>}
               <ChevronDown size={13} color="rgba(167,139,250,0.6)" />
             </button>
 
             {showMenu && (
-              <div ref={menuRef} style={{
-                position: "absolute", right: 0, top: "calc(100% + 8px)",
-                background: "#181830", border: "1px solid rgba(124,58,237,0.3)",
-                borderRadius: 14, boxShadow: "0 16px 50px rgba(0,0,0,0.6)",
-                width: 190, overflow: "hidden", zIndex: 100,
-              }}>
-                <MenuItem icon={<Edit size={15} color="#a78bfa" />} label="Edit Profile" onClick={() => { onEditClick(); setShowMenu(false); }} />
-                {currentUser.role === "admin" && (
+              <div className="dropdown-menu">
+                <button className="dropdown-item" style={{ color: "#e0e0ff" }}
+                  onClick={() => { onEditClick(); setShowMenu(false); }}>
+                  <Edit size={15} color="#a78bfa" /> Edit Profile
+                </button>
+                {isAdmin && (
                   <>
-                    <div style={{ height: 1, background: "rgba(124,58,237,0.12)", margin: "0 12px" }} />
-                    <MenuItem
-                      icon={<Shield size={15} color="#f9a8d4" />}
-                      label="Admin Dashboard"
-                      onClick={() => { navigate("/admin"); setShowMenu(false); }}
-                      color="#f9a8d4"
-                    />
+                    <div className="dropdown-divider" />
+                    <button className="dropdown-item" style={{ color: "#f9a8d4" }}
+                      onClick={() => { navigate("/admin"); setShowMenu(false); }}>
+                      <Shield size={15} color="#f9a8d4" /> Admin Dashboard
+                    </button>
                   </>
                 )}
-                <div style={{ height: 1, background: "rgba(124,58,237,0.12)", margin: "0 12px" }} />
-                <MenuItem icon={<LogOut size={15} />} label="Logout" onClick={() => { onLogout(); setShowMenu(false); }} color="#fb7185" />
+                <div className="dropdown-divider" />
+                <button className="dropdown-item" style={{ color: "#fb7185" }}
+                  onClick={() => { onLogout(); setShowMenu(false); }}>
+                  <LogOut size={15} /> Logout
+                </button>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* Mobile hamburger (3 dots / menu icon) */}
+        {currentUser && (
+          <div style={{ position: "relative" }} className="mobileMenuBtn" ref={mobileRef}>
+            <button
+              onClick={() => setShowMobileMenu(v => !v)}
+              className="user-menu-btn"
+              aria-label="Open menu"
+              style={{ gap: 6, padding: "5px 8px" }}
+            >
+              {currentUser.profileImage
+                ? <img src={currentUser.profileImage} alt={currentUser.nickName || currentUser.name} className="avatar-sm" />
+                : <div className="avatar-fallback">{(currentUser.nickName || currentUser.name)?.[0]?.toUpperCase() || "?"}</div>
+              }
+              {showMobileMenu ? <X size={16} color="#a78bfa" /> : <ChevronDown size={16} color="#a78bfa" />}
+            </button>
+
+            {showMobileMenu && (
+              <>
+                {/* Overlay to close on outside tap */}
+                <div
+                  style={{
+                    position: "fixed", inset: 0, zIndex: 48,
+                  }}
+                  onClick={() => setShowMobileMenu(false)}
+                />
+                {/* Dropdown */}
+                <div className="dropdown-menu" style={{ zIndex: 49, minWidth: 210 }}>
+                  {/* User info row */}
+                  <div style={{ padding: "12px 16px 10px", borderBottom: "1px solid rgba(124,58,237,0.12)" }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#f0f0ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {currentUser.nickName || currentUser.name}
+                    </div>
+                    <div style={{ fontSize: 11, color: "rgba(167,139,250,0.5)", marginTop: 2 }}>
+                      {currentUser.email || ""}
+                    </div>
+                    {isAdmin && <span className="badge-admin" style={{ marginTop: 4, display: "inline-block" }}>ADMIN</span>}
+                  </div>
+
+                  {isAdmin && (
+                    <button className="dropdown-item" style={{ color: "#a78bfa" }}
+                      onClick={() => { onJoinClick(); setShowMobileMenu(false); }}>
+                      <Plus size={15} color="#a78bfa" /> New Group
+                    </button>
+                  )}
+
+                  <button className="dropdown-item" style={{ color: "#e0e0ff" }}
+                    onClick={() => { onEditClick(); setShowMobileMenu(false); }}>
+                    <Edit size={15} color="#a78bfa" /> Edit Profile
+                  </button>
+
+                  {isAdmin && (
+                    <>
+                      <div className="dropdown-divider" />
+                      <button className="dropdown-item" style={{ color: "#f9a8d4" }}
+                        onClick={() => { navigate("/admin"); setShowMobileMenu(false); }}>
+                        <Shield size={15} color="#f9a8d4" /> Admin Dashboard
+                      </button>
+                    </>
+                  )}
+                  <div className="dropdown-divider" />
+                  <button className="dropdown-item" style={{ color: "#fb7185" }}
+                    onClick={() => { onLogout(); setShowMobileMenu(false); }}>
+                    <LogOut size={15} /> Logout
+                  </button>
+                </div>
+              </>
             )}
           </div>
         )}
@@ -168,31 +170,3 @@ export default function Header({
     </header>
   );
 }
-
-function MenuItem({ icon, label, onClick, color = "#e0e0ff" }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        display: "flex", alignItems: "center", gap: 10,
-        width: "100%", padding: "12px 16px",
-        background: "none", border: "none", cursor: "pointer",
-        color, fontSize: 13, fontWeight: 500,
-        transition: "background 0.15s", textAlign: "left",
-        fontFamily: "'DM Sans', sans-serif",
-      }}
-      onMouseEnter={e => e.currentTarget.style.background = "rgba(124,58,237,0.12)"}
-      onMouseLeave={e => e.currentTarget.style.background = "none"}
-    >
-      {icon} {label}
-    </button>
-  );
-}
-
-const iconBtn = {
-  width: 38, height: 38, borderRadius: 10, cursor: "pointer",
-  background: "rgba(255,255,255,0.05)",
-  border: "1px solid rgba(124,58,237,0.2)",
-  color: "#a78bfa", display: "flex", alignItems: "center", justifyContent: "center",
-  transition: "all 0.2s",
-};

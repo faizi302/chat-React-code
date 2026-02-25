@@ -21,7 +21,7 @@ function AppRoutes() {
     <Routes>
       {/* Public routes */}
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
-      <Route path="/signup" element={<PublicRoute><SignupPage /></PublicRoute>} />
+      {/* <Route path="/signup" element={<PublicRoute><SignupPage /></PublicRoute>} /> */}
 
       {/* Admin-only route */}
       <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />

@@ -3,29 +3,23 @@ import { ShieldCheck, Wifi, Zap } from "lucide-react";
 
 export default function Footer() {
   return (
-    <footer className="h-11 flex-shrink-0 bg-gradient-to-r from-[#0f0c29] via-[#1a1040] to-[#0f0c29] border-t border-purple-900/15 flex items-center justify-between px-6 relative z-10">
-      {/* Glow line */}
-      <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-600 via-cyan-500 to-pink-500 opacity-55" />
-
-      <div className="flex items-center gap-2 text-green-400 text-sm font-semibold">
+    <footer className="footer">
+      <div className="footer-glow" />
+      <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#4ade80", fontSize: 14, fontWeight: 600 }}>
         <ShieldCheck size={15} />
         <span className="hidden sm:inline">End-to-End Secure</span>
       </div>
-
-      <div className="flex items-center gap-2">
-        <Zap size={13} className="text-purple-300/60" />
-        <span className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-cyan-300 tracking-wide">
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <Zap size={13} style={{ color: "rgba(167,139,250,0.6)" }} />
+        <span style={{ fontWeight: 800, background: "linear-gradient(90deg,#c4b5fd,#67e8f9)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", letterSpacing: 1 }}>
           StandardChat
         </span>
-        <span className="text-xs text-purple-300/30">
-          © {new Date().getFullYear()}
-        </span>
+        <span style={{ fontSize: 12, color: "rgba(167,139,250,0.3)" }}>© {new Date().getFullYear()}</span>
       </div>
-
-      <div className="flex items-center gap-2">
-        <Wifi size={14} className="text-cyan-300/60" />
-        <div className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-lg shadow-green-500/50 animate-pulse" />
-        <span className="text-sm text-cyan-300/60 font-medium hidden sm:inline">Live</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <Wifi size={14} style={{ color: "rgba(103,232,249,0.6)" }} />
+        <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 8px #22c55e", animation: "pulse 2s infinite" }} />
+        <span className="hidden sm:inline" style={{ fontSize: 13, color: "rgba(103,232,249,0.6)", fontWeight: 500 }}>Live</span>
       </div>
     </footer>
   );

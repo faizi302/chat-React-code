@@ -1,193 +1,382 @@
-// ChatDashboard.jsx
 import React, { useState, useRef, useEffect } from "react";
 import Message from "./Message";
-import {
-  Send, Hash, MessageSquare, Paperclip, Zap,
-  Users, DoorOpen, Edit, Trash2, Shield, ShieldOff,
-  MessageSquareOff, MessageSquareText, MoreVertical, X,
-} from "lucide-react";
+import { Send, Hash, MessageSquare, Paperclip, Zap, Users, DoorOpen, Edit, Trash2, MessageSquareOff, MessageSquareText, MoreVertical, X, Image, File, Crop, RotateCcw } from "lucide-react";
 import { uploadFile } from "../api/api";
 
-const compressImage = (file, maxWidth = 800, quality = 0.7) => {
+/* ── helpers ── */
+function formatFileSize(bytes) {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(1)} MB`;
+  return `${(bytes / 1073741824).toFixed(2)} GB`;
+}
+
+async function compressImage(file, maxWidth = 1200, quality = 0.82) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.src = URL.createObjectURL(file);
     img.onload = () => {
       const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      const ratio = img.width / img.height;
-      canvas.width = maxWidth;
-      canvas.height = maxWidth / ratio;
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob(blob => {
-        resolve(new File([blob], file.name, { type: file.type }));
-      }, file.type, quality);
+      const ratio = img.height / img.width;
+      canvas.width = Math.min(maxWidth, img.width);
+      canvas.height = canvas.width * ratio;
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(blob => resolve(new File([blob], file.name, { type: file.type })), file.type, quality);
     };
     img.onerror = reject;
   });
-};
+}
 
+async function getCroppedBlob(imgEl, crop, fileName, fileType) {
+  return new Promise(resolve => {
+    const sx = imgEl.naturalWidth / imgEl.width;
+    const sy = imgEl.naturalHeight / imgEl.height;
+    const canvas = document.createElement("canvas");
+    canvas.width = crop.width * sx;
+    canvas.height = crop.height * sy;
+    canvas.getContext("2d").drawImage(imgEl, crop.x * sx, crop.y * sy, crop.width * sx, crop.height * sy, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(blob => resolve(new File([blob], fileName, { type: fileType })), fileType, 0.92);
+  });
+}
+
+/* ── Attach Popover (opens above the paperclip button) ── */
+function AttachPopover({ onSelectMedia, onSelectFile, onClose }) {
+  const ref = useRef(null);
+
+  // Close on outside click
+  useEffect(() => {
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [onClose]);
+
+  const items = [
+    {
+      icon: <Image size={22} color="#a78bfa" />,
+      label: "Photo / Video",
+      desc: "Images, GIFs, videos",
+      onClick: onSelectMedia,
+    },
+    {
+      icon: <File size={22} color="#67e8f9" />,
+      label: "File",
+      desc: "PDF, ZIP, any file",
+      onClick: onSelectFile,
+    },
+  ];
+
+  return (
+    <div
+      ref={ref}
+      className="attach-popover"
+      role="menu"
+    >
+      {items.map(({ icon, label, desc, onClick }) => (
+        <button
+          key={label}
+          className="attach-pop-btn"
+          onClick={onClick}
+          role="menuitem"
+        >
+          <div className="attach-pop-icon">{icon}</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#f0f0ff", textAlign: "center" }}>{label}</div>
+          <div style={{ fontSize: 10, color: "rgba(167,139,250,0.45)", textAlign: "center", marginTop: 1 }}>{desc}</div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ── Image preview + crop ── */
+function ImagePreviewModal({ file, onSend, onCancel, sending }) {
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [crop, setCrop] = useState(null);
+  const [cropping, setCropping] = useState(false);
+  const [caption, setCaption] = useState("");
+  const imgRef = useRef(null);
+  const startRef = useRef(null);
+
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const onMouseDown = e => {
+    if (!cropping) return;
+    const rect = imgRef.current.getBoundingClientRect();
+    startRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    setCrop({ x: startRef.current.x, y: startRef.current.y, width: 0, height: 0 });
+  };
+  const onMouseMove = e => {
+    if (!cropping || !startRef.current) return;
+    const rect = imgRef.current.getBoundingClientRect();
+    const cx = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    const cy = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
+    const sx = startRef.current.x, sy = startRef.current.y;
+    setCrop({ x: Math.min(cx, sx), y: Math.min(cy, sy), width: Math.abs(cx - sx), height: Math.abs(cy - sy) });
+  };
+  const onMouseUp = () => { startRef.current = null; };
+
+  const handleSend = async () => {
+    let f = file;
+    if (crop && crop.width > 10 && crop.height > 10 && imgRef.current)
+      f = await getCroppedBlob(imgRef.current, crop, file.name, file.type);
+    onSend(f, caption);
+  };
+
+  return (
+    <div className="preview-modal-backdrop">
+      <div className="preview-modal-card">
+        <div className="preview-header">
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#f0f0ff" }}>Preview</span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className={`crop-btn ${cropping ? "active" : "inactive"}`} onClick={() => { setCropping(v => !v); setCrop(null); }}>
+              <Crop size={14} /> Crop
+            </button>
+            {crop && (
+              <button className="reset-btn" onClick={() => { setCrop(null); setCropping(false); }}>
+                <RotateCcw size={14} />
+              </button>
+            )}
+            <button onClick={onCancel} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(167,139,250,0.5)", display: "flex" }}>
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+
+        <div className="preview-img-area">
+          {previewUrl && (
+            <div style={{ position: "relative", display: "inline-block", lineHeight: 0 }}>
+              <img ref={imgRef} src={previewUrl} alt="preview" draggable={false}
+                style={{ maxWidth: "100%", maxHeight: "52vh", borderRadius: 12, display: "block", userSelect: "none", cursor: cropping ? "crosshair" : "default" }}
+                onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}
+              />
+              {crop && crop.width > 2 && crop.height > 2 && (
+                <div style={{ position: "absolute", left: crop.x, top: crop.y, width: crop.width, height: crop.height, border: "2px solid #a78bfa", background: "rgba(167,139,250,0.1)", pointerEvents: "none", boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)" }} />
+              )}
+            </div>
+          )}
+        </div>
+        {cropping && <div style={{ textAlign: "center", fontSize: 12, color: "rgba(167,139,250,0.5)", paddingBottom: 6 }}>Drag on image to select crop area</div>}
+
+        <div style={{ padding: "10px 16px", borderTop: "1px solid rgba(124,58,237,0.1)" }}>
+          <input value={caption} onChange={e => setCaption(e.target.value)} placeholder="Add a caption…" className="caption-input" />
+        </div>
+        <div className="btn-row" style={{ padding: "12px 16px 20px" }}>
+          <button className="btn-secondary" onClick={onCancel}>Cancel</button>
+          <button className="btn-primary" style={{ flex: 2 }} onClick={handleSend} disabled={sending}>
+            {sending ? <><div className="spinner" /> Sending…</> : <><Send size={16} /> Send</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── File preview ── */
+function FilePreviewModal({ file, onSend, onCancel, sending }) {
+  const [caption, setCaption] = useState("");
+  const ext = (file.name || "").split(".").pop().toUpperCase();
+  return (
+    <div className="preview-modal-backdrop">
+      <div className="preview-modal-card" style={{ width: "min(420px,96vw)" }}>
+        <div className="preview-header">
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#f0f0ff" }}>Send File</span>
+          <button onClick={onCancel} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(167,139,250,0.5)", display: "flex" }}><X size={20} /></button>
+        </div>
+        <div style={{ padding: "20px 18px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 14, padding: 14 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 12, background: "rgba(124,58,237,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <File size={22} color="#a78bfa" />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#f0f0ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name}</div>
+              <div style={{ fontSize: 12, color: "rgba(167,139,250,0.5)", marginTop: 2 }}>{ext} · {formatFileSize(file.size)}</div>
+            </div>
+          </div>
+          <input value={caption} onChange={e => setCaption(e.target.value)} placeholder="Add a caption…" className="caption-input" style={{ marginTop: 14 }} />
+        </div>
+        <div className="btn-row" style={{ padding: "0 18px 20px" }}>
+          <button className="btn-secondary" onClick={onCancel}>Cancel</button>
+          <button className="btn-primary" style={{ flex: 2 }} onClick={() => onSend(file, caption)} disabled={sending}>
+            {sending ? <><div className="spinner" /> Sending…</> : <><Send size={16} /> Send</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Auto-grow textarea ── */
+function AutoTextarea({ value, onChange, onKeyDown, placeholder, disabled }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 160) + "px";
+    el.style.overflowY = el.scrollHeight > 160 ? "auto" : "hidden";
+  }, [value]);
+  return (
+    <textarea ref={ref} value={value} onChange={onChange} onKeyDown={onKeyDown}
+      placeholder={placeholder} disabled={disabled} rows={1}
+      className="chat-textarea" />
+  );
+}
+
+/* ── Main ── */
 export default function ChatDashboard({
-  activeRoom,
-  messages,
-  currentUser,
-  socket,
-  typingUsers,
-  usersMap,
-  onlineMap,
-  onRequestReaders,
-  onAddReaction,
-  // Group action callbacks (from App.jsx)
-  onShowMembers,
-  onLeaveGroup,
-  onEditGroup,
-  onDeleteGroup,
-  onClearChat,
-  onToggleAdminOnly,
+  activeRoom, messages, currentUser, socket, typingUsers,
+  usersMap, onlineMap, onRequestReaders, onAddReaction,
+  onShowMembers, onLeaveGroup, onEditGroup, onDeleteGroup, onClearChat, onToggleAdminOnly,
 }) {
   const [text, setText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
-  const [uploading, setUploading] = useState(false);
+  const [sending, setSending] = useState(false);
   const [showGroupMenu, setShowGroupMenu] = useState(false);
   const [sendError, setSendError] = useState("");
+  const [showAttachPopover, setShowAttachPopover] = useState(false);
+  const [pendingFile, setPendingFile] = useState(null);
   const scrollRef = useRef();
-  const typingTimeout = useRef();
-  const fileInputRef = useRef();
+  const typingTimer = useRef();
+  const mediaRef = useRef();
+  const fileRef = useRef();
   const groupMenuRef = useRef();
+  const attachWrapRef = useRef();
 
-  useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+
+  // Helper: returns "Today", "Yesterday", or "Mon, Feb 23"
+  const getDayLabel = (createdAt) => {
+    const date = new Date(createdAt);
+    const now = new Date();
+
+    // Start of today (local time)
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const msgDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+    if (msgDay.getTime() === today.getTime()) return "Today";
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (msgDay.getTime() === yesterday.getTime()) return "Yesterday";
+
+    // For older days within the 7-day window
+    return date.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  // Helper: used to detect day change
+  const getDayStart = (createdAt) => {
+    const d = new Date(createdAt);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  };
 
   useEffect(() => {
     if (!activeRoom) return;
-    if (text && !isTyping) {
-      socket?.emit("typing_start", { roomId: activeRoom._id });
-      setIsTyping(true);
-    }
-    clearTimeout(typingTimeout.current);
-    typingTimeout.current = setTimeout(() => {
-      if (isTyping) {
-        socket?.emit("typing_stop", { roomId: activeRoom._id });
-        setIsTyping(false);
-      }
+    if (text && !isTyping) { socket?.emit("typing_start", { roomId: activeRoom._id }); setIsTyping(true); }
+    clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(() => {
+      if (isTyping) { socket?.emit("typing_stop", { roomId: activeRoom._id }); setIsTyping(false); }
     }, 2000);
-    return () => clearTimeout(typingTimeout.current);
+    return () => clearTimeout(typingTimer.current);
   }, [text, isTyping, activeRoom?._id, socket]);
 
-  // Close group menu on outside click
   useEffect(() => {
-    const handler = (e) => {
-      if (groupMenuRef.current && !groupMenuRef.current.contains(e.target)) {
-        setShowGroupMenu(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    const h = e => { if (groupMenuRef.current && !groupMenuRef.current.contains(e.target)) setShowGroupMenu(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  // Listen for send errors from socket
   useEffect(() => {
     if (!socket) return;
-    const handleSendError = ({ message }) => {
-      setSendError(message);
-      setTimeout(() => setSendError(""), 3000);
-    };
-    socket.on("send_error", handleSendError);
-    return () => socket.off("send_error", handleSendError);
+    const h = ({ message }) => { setSendError(message); setTimeout(() => setSendError(""), 3000); };
+    socket.on("send_error", h);
+    return () => socket.off("send_error", h);
   }, [socket]);
 
-  const handleFileChange = async e => {
+  const handleMediaChange = e => {
     const file = e.target.files[0];
     if (!file) return;
-    setUploading(true);
-    let compressed = file;
+    setPendingFile({ file, isImage: file.type.startsWith("image/") });
+    setShowAttachPopover(false);
+    if (mediaRef.current) mediaRef.current.value = "";
+  };
+
+  const handleFileChange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setPendingFile({ file, isImage: false });
+    setShowAttachPopover(false);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const handleFileSend = async (file, caption) => {
+    setSending(true);
+    let toUpload = file;
     if (file.type.startsWith("image/")) {
-      try { compressed = await compressImage(file); } catch (err) { console.error("Compression failed:", err); }
+      try { toUpload = await compressImage(file); } catch (e) { console.error("Compress", e); }
     }
     try {
-      const result = await uploadFile(compressed);
+      const result = await uploadFile(toUpload);
       if (!result?.url) throw new Error("Upload failed");
       let mediaType = "file";
       if (file.type.startsWith("image/")) mediaType = "image";
       if (file.type.startsWith("video/")) mediaType = "video";
-      sendMessage(mediaType, result.url, file.name || "");
+      socket?.emit("send_message", {
+        roomId: activeRoom._id, content: caption || file.name || "",
+        senderId: currentUser._id, mediaType, mediaUrl: result.url,
+        fileSize: file.size, repliedTo: replyingTo?._id,
+      });
+      setReplyingTo(null);
+      setPendingFile(null);
     } catch (err) {
-      console.error("File upload error:", err);
-      alert("Failed to upload file. Please try again.");
+      console.error("Upload error:", err);
+      alert("Failed to upload. Please try again.");
     }
-    setUploading(false);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    setSending(false);
   };
 
-  const sendMessage = (mediaType = "text", mediaUrl = "", caption = "") => {
-    if (mediaType === "text" && !text.trim()) return;
+  const sendTextMessage = async () => {
+    if (!text.trim() || sending) return;
+    setSending(true);
     try {
       socket?.emit("send_message", {
-        roomId: activeRoom._id,
-        content: mediaType === "text" ? text : caption,
-        senderId: currentUser._id,
-        mediaType, mediaUrl,
+        roomId: activeRoom._id, content: text,
+        senderId: currentUser._id, mediaType: "text", mediaUrl: "",
         repliedTo: replyingTo?._id,
       });
-      setText("");
-      setReplyingTo(null);
-    } catch (err) {
-      console.error("Send message error:", err);
-      alert("Failed to send message.");
-    }
+      setText(""); setReplyingTo(null);
+    } catch (err) { console.error("Send error:", err); }
+    setSending(false);
   };
 
-  const typingText = typingUsers
-    .filter(id => id !== currentUser._id)
-    .map(id => usersMap[id]?.nickName)
-    .filter(Boolean)
-    .join(", ");
+  const handleKeyDown = e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendTextMessage(); }
+  };
 
-  // Determine current user's role in the group
+  const typingText = typingUsers.filter(id => id !== currentUser._id).map(id => usersMap[id]?.nickName).filter(Boolean).join(", ");
   const isAppAdmin = currentUser?.role === "admin";
-  const isMainAdmin = activeRoom?.mainAdmin === currentUser?._id ||
-    activeRoom?.mainAdmin?._id === currentUser?._id ||
-    activeRoom?.mainAdmin?.toString() === currentUser?._id;
-  const isGroupAdmin = isMainAdmin ||
-    activeRoom?.groupAdmins?.some(a =>
-      (a._id || a)?.toString() === currentUser?._id
-    );
-  const canManageGroup = isAppAdmin || isGroupAdmin;
-  const canDeleteGroup = isAppAdmin || isMainAdmin;
+  const isMainAdmin = activeRoom?.mainAdmin === currentUser?._id || activeRoom?.mainAdmin?._id === currentUser?._id;
+  const isGroupAdmin = isMainAdmin || activeRoom?.groupAdmins?.some(a => (a._id || a)?.toString() === currentUser?._id);
+  const canManage = isAppAdmin || isGroupAdmin;
+  const canDeleteGrp = isAppAdmin || isMainAdmin;
   const canSend = !activeRoom?.onlyAdminCanSend || isGroupAdmin || isAppAdmin;
-  const isMember = activeRoom?.members?.some(m =>
-    (m._id || m)?.toString() === currentUser?._id
-  );
+  const isMember = activeRoom?.members?.some(m => (m._id || m)?.toString() === currentUser?._id);
+  const canSendNow = !!text.trim() && !sending;
 
-  /* ── No room selected ── */
   if (!activeRoom) {
     return (
-      <div style={{
-        flex: 1, display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center", gap: 20,
-        background: "#09091a",
-      }}>
-        <div style={{
-          width: 90, height: 90, borderRadius: 24,
-          background: "rgba(24,24,48,1)",
-          border: "1px solid rgba(124,58,237,0.3)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: "0 0 40px rgba(124,58,237,0.2)",
-        }}>
-          <Zap size={40} color="#7c3aed" />
-        </div>
-        <div style={{
-          fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 24,
-          background: "linear-gradient(90deg,#a78bfa,#67e8f9)",
-          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-        }}>
-          Start Chatting
-        </div>
-        <div style={{ fontSize: 15, color: "rgba(167,139,250,0.4)" }}>
-          Select a conversation or create a new group
-        </div>
+      <div className="empty-state">
+        <div className="empty-icon"><Zap size={40} color="#7c3aed" /></div>
+        <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 22, background: "linear-gradient(90deg,#a78bfa,#67e8f9)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", textAlign: "center" }}>Start Chatting</div>
+        <div style={{ fontSize: 14, color: "rgba(167,139,250,0.4)", textAlign: "center" }}>Select a conversation or create a new group</div>
       </div>
     );
   }
@@ -195,327 +384,194 @@ export default function ChatDashboard({
   const isGroup = activeRoom.type === "group";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden", background: "#09091a" }}>
+    <>
+      <input type="file" ref={mediaRef} onChange={handleMediaChange} accept="image/*,video/*" style={{ display: "none" }} />
+      <input type="file" ref={fileRef} onChange={handleFileChange} accept="*/*" style={{ display: "none" }} />
 
-      {/* ── Chat topbar with group actions ── */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 12,
-        padding: "0 16px", flexShrink: 0, height: 60,
-        background: "rgba(13,13,31,0.98)",
-        borderBottom: "1px solid rgba(124,58,237,0.15)",
-        boxShadow: "0 2px 12px rgba(0,0,0,0.3)",
-      }}>
-        {/* Room icon + name */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
-          {isGroup ? <Hash size={18} color="#a78bfa" /> : <MessageSquare size={18} color="#67e8f9" />}
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#f0f0ff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {activeRoom.name ||
-                activeRoom.members?.find(m => (m._id || m) !== currentUser?._id)?.nickName ||
-                "Chat"}
-            </div>
-            {isGroup && (
-              <div style={{ fontSize: 11, color: "rgba(167,139,250,0.45)", display: "flex", alignItems: "center", gap: 6, marginTop: 1 }}>
-                <span>{activeRoom.memberCount || activeRoom.members?.length || 0} members</span>
-                {activeRoom.onlyAdminCanSend && (
-                  <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 4, background: "rgba(251,113,133,0.15)", color: "#fb7185", border: "1px solid rgba(251,113,133,0.25)", fontWeight: 700 }}>
-                    🔒 Admin only
-                  </span>
-                )}
-                {isMainAdmin && (
-                  <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 4, background: "rgba(236,72,153,0.15)", color: "#f9a8d4", border: "1px solid rgba(236,72,153,0.25)", fontWeight: 700 }}>
-                    👑 Main Admin
-                  </span>
-                )}
-                {!isMainAdmin && isGroupAdmin && !isAppAdmin && (
-                  <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 4, background: "rgba(124,58,237,0.15)", color: "#a78bfa", border: "1px solid rgba(124,58,237,0.25)", fontWeight: 700 }}>
-                    🛡 Admin
-                  </span>
-                )}
-                {isAppAdmin && (
-                  <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 4, background: "rgba(6,182,212,0.15)", color: "#67e8f9", border: "1px solid rgba(6,182,212,0.25)", fontWeight: 700 }}>
-                    ⚡ App Admin
-                  </span>
-                )}
+      {pendingFile?.isImage && <ImagePreviewModal file={pendingFile.file} onSend={handleFileSend} onCancel={() => setPendingFile(null)} sending={sending} />}
+      {pendingFile && !pendingFile.isImage && <FilePreviewModal file={pendingFile.file} onSend={handleFileSend} onCancel={() => setPendingFile(null)} sending={sending} />}
+
+      <div className="chat-shell">
+        {/* Topbar */}
+        <div className="chat-topbar">
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+            {isGroup ? <Hash size={16} color="#a78bfa" style={{ flexShrink: 0 }} /> : <MessageSquare size={16} color="#67e8f9" style={{ flexShrink: 0 }} />}
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "#f0f0ff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {activeRoom.name || activeRoom.members?.find(m => (m._id || m) !== currentUser?._id)?.nickName || "Chat"}
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Group action buttons */}
-        {isGroup && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-            {/* Members button */}
-            <button
-              onClick={onShowMembers}
-              title="View members"
-              style={topbarBtn("#a78bfa", "rgba(124,58,237,0.12)")}
-              onMouseEnter={e => e.currentTarget.style.background = "rgba(124,58,237,0.25)"}
-              onMouseLeave={e => e.currentTarget.style.background = "rgba(124,58,237,0.12)"}
-            >
-              <Users size={16} />
-              <span className="hidden sm:inline" style={{ fontSize: 12, fontWeight: 600 }}>Members</span>
-            </button>
-
-            {/* Edit group (admins only) */}
-            {canManageGroup && (
-              <button
-                onClick={onEditGroup}
-                title="Edit group"
-                style={topbarBtn("#67e8f9", "rgba(6,182,212,0.1)")}
-                onMouseEnter={e => e.currentTarget.style.background = "rgba(6,182,212,0.22)"}
-                onMouseLeave={e => e.currentTarget.style.background = "rgba(6,182,212,0.1)"}
-              >
-                <Edit size={15} />
-                <span className="hidden md:inline" style={{ fontSize: 12, fontWeight: 600 }}>Edit</span>
-              </button>
-            )}
-
-            {/* More menu */}
-            <div style={{ position: "relative" }} ref={groupMenuRef}>
-              <button
-                onClick={() => setShowGroupMenu(v => !v)}
-                title="More options"
-                style={topbarBtn("rgba(167,139,250,0.7)", "rgba(255,255,255,0.05)")}
-                onMouseEnter={e => e.currentTarget.style.background = "rgba(124,58,237,0.15)"}
-                onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
-              >
-                <MoreVertical size={16} />
-              </button>
-
-              {showGroupMenu && (
-                <div style={{
-                  position: "absolute", right: 0, top: "calc(100% + 6px)",
-                  background: "#181830",
-                  border: "1px solid rgba(124,58,237,0.3)",
-                  borderRadius: 14, boxShadow: "0 16px 50px rgba(0,0,0,0.7)",
-                  width: 210, overflow: "hidden", zIndex: 200,
-                }}>
-                  {/* Toggle Admin Only Send */}
-                  {canManageGroup && (
-                    <GroupMenuItem
-                      icon={activeRoom.onlyAdminCanSend ? <MessageSquareText size={15} /> : <MessageSquareOff size={15} />}
-                      label={activeRoom.onlyAdminCanSend ? "Allow All to Send" : "Admin-Only Send"}
-                      color={activeRoom.onlyAdminCanSend ? "#4ade80" : "#fb7185"}
-                      onClick={() => { onToggleAdminOnly(); setShowGroupMenu(false); }}
-                    />
-                  )}
-
-                  {/* Clear Chat */}
-                  {(canManageGroup) && (
-                    <GroupMenuItem
-                      icon={<Trash2 size={15} />}
-                      label="Clear Chat"
-                      color="#fb7185"
-                      onClick={() => { onClearChat(); setShowGroupMenu(false); }}
-                    />
-                  )}
-
-                  {/* Leave Group (members who aren't main admin, and non-app-admins) */}
-                  {isMember && !isAppAdmin && (
-                    <>
-                      <div style={{ height: 1, background: "rgba(124,58,237,0.12)", margin: "0 12px" }} />
-                      <GroupMenuItem
-                        icon={<DoorOpen size={15} />}
-                        label="Leave Group"
-                        color="#f97316"
-                        onClick={() => { onLeaveGroup(); setShowGroupMenu(false); }}
-                      />
-                    </>
-                  )}
-
-                  {/* Delete Group (main admin or app admin) */}
-                  {canDeleteGroup && (
-                    <>
-                      <div style={{ height: 1, background: "rgba(124,58,237,0.12)", margin: "0 12px" }} />
-                      <GroupMenuItem
-                        icon={<Trash2 size={15} />}
-                        label="Delete Group"
-                        color="#ef4444"
-                        onClick={() => { onDeleteGroup(); setShowGroupMenu(false); }}
-                      />
-                    </>
-                  )}
+              {isGroup && (
+                <div style={{ fontSize: 10, color: "rgba(167,139,250,0.45)", display: "flex", alignItems: "center", gap: 5, marginTop: 1, flexWrap: "wrap" }}>
+                  <span>{activeRoom.memberCount || activeRoom.members?.length || 0} members</span>
+                  {activeRoom.onlyAdminCanSend && <span className="tag-admin-only">🔒 Admin only</span>}
+                  {isMainAdmin && <span className="tag-main-admin">👑 Main Admin</span>}
+                  {!isMainAdmin && isGroupAdmin && !isAppAdmin && <span className="tag-group-admin">🛡 Admin</span>}
+                  {isAppAdmin && <span className="tag-app-admin">⚡ App Admin</span>}
                 </div>
               )}
             </div>
           </div>
-        )}
-      </div>
 
-      {/* ── Messages ── */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "20px 16px" }}>
-        {messages.map((m, i) => (
-          <Message
-            key={i}
-            message={m}
-            currentUser={currentUser}
-            usersMap={usersMap}
-            isGroup={isGroup}
-            onRequestReaders={onRequestReaders}
-            onReply={msg => setReplyingTo(msg)}
-            onAddReaction={onAddReaction}
-          />
-        ))}
-        <div ref={scrollRef} />
-      </div>
+          {isGroup && (
+            <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+              <button className="tb-btn tb-btn-members" onClick={onShowMembers}>
+                <Users size={15} /><span className="tb-label">Members</span>
+              </button>
+              {canManage && (
+                <button className="tb-btn tb-btn-edit" onClick={onEditGroup}>
+                  <Edit size={14} /><span className="tb-label">Edit</span>
+                </button>
+              )}
+              <div style={{ position: "relative" }} ref={groupMenuRef}>
+                <button className="tb-btn tb-btn-more" onClick={() => setShowGroupMenu(v => !v)}>
+                  <MoreVertical size={15} />
+                </button>
+                {showGroupMenu && (
+                  <div className="group-menu">
+                    {canManage && (
+                      <button className="group-menu-item" style={{ color: activeRoom.onlyAdminCanSend ? "#4ade80" : "#fb7185" }}
+                        onClick={() => { onToggleAdminOnly(); setShowGroupMenu(false); }}>
+                        {activeRoom.onlyAdminCanSend ? <MessageSquareText size={15} /> : <MessageSquareOff size={15} />}
+                        {activeRoom.onlyAdminCanSend ? "Allow All to Send" : "Admin-Only Send"}
+                      </button>
+                    )}
+                    {canManage && (
+                      <>
+                        <div className="group-menu-divider" />
+                        <button className="group-menu-item" style={{ color: "#fb7185" }} onClick={() => { onClearChat(); setShowGroupMenu(false); }}>
+                          <Trash2 size={15} /> Clear Chat
+                        </button>
+                      </>
+                    )}
+                    {isMember && !isAppAdmin && (
+                      <>
+                        <div className="group-menu-divider" />
+                        <button className="group-menu-item" style={{ color: "#f97316" }} onClick={() => { onLeaveGroup(); setShowGroupMenu(false); }}>
+                          <DoorOpen size={15} /> Leave Group
+                        </button>
+                      </>
+                    )}
+                    {canDeleteGrp && (
+                      <>
+                        <div className="group-menu-divider" />
+                        <button className="group-menu-item" style={{ color: "#ef4444" }} onClick={() => { onDeleteGroup(); setShowGroupMenu(false); }}>
+                          <Trash2 size={15} /> Delete Group
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
-      {/* ── Input area ── */}
-      <div style={{
-        flexShrink: 0,
-        padding: "14px 20px 18px",
-        background: "rgba(9,9,26,0.97)",
-        borderTop: "1px solid rgba(124,58,237,0.12)",
-      }}>
-        {/* Send error */}
-        {sendError && (
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            background: "rgba(244,63,94,0.1)", border: "1px solid rgba(244,63,94,0.3)",
-            borderRadius: 10, padding: "8px 14px", marginBottom: 10,
-            fontSize: 13, color: "#fb7185",
-          }}>
-            <span>🔒 {sendError}</span>
-            <button onClick={() => setSendError("")} style={{ background: "none", border: "none", cursor: "pointer", color: "#fb7185" }}>
-              <X size={14} />
-            </button>
-          </div>
-        )}
+        {/* Messages */}
+        {/* Messages */}
+        <div className="chat-messages">
+          {messages.map((m, i) => {
+            const showHeader = i === 0 ||
+              getDayStart(m.createdAt) !== getDayStart(messages[i - 1].createdAt);
 
-        {/* Typing indicator */}
-        {typingText && (
-          <div style={{
-            display: "flex", alignItems: "center", gap: 8,
-            fontSize: 13, color: "#a78bfa", marginBottom: 10,
-          }}>
-            {typingText} is typing…
-          </div>
-        )}
+            return (
+              <div key={m._id}>   {/* changed from key={i} → better */}
+                {showHeader && (
+                  <div className="flex justify-center my-6">
+                    <div className="
+                                       px-4 py-1.5 
+                                       text-xs font-medium 
+                                       text-gray-500
+                                       bg-white/5 
+                                       backdrop-blur-md
+                                       border border-white/10
+                                       rounded-full
+                                       shadow-md
+                                     ">
+                      {getDayLabel(m.createdAt)}
+                    </div>
+                  </div>
+                )}
+                <Message
+                  key={m._id}
+                  message={m}
+                  currentUser={currentUser}
+                  usersMap={usersMap}
+                  isGroup={isGroup}
+                  onRequestReaders={onRequestReaders}
+                  onReply={msg => setReplyingTo(msg)}
+                  onAddReaction={onAddReaction}
+                />
+              </div>
+            );
+          })}
+          <div ref={scrollRef} />
+        </div>
 
-        {/* Reply bar */}
-        {replyingTo && (
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            background: "rgba(24,24,48,1)",
-            border: "1px solid rgba(124,58,237,0.3)",
-            borderRadius: 12, padding: "10px 16px", marginBottom: 10,
-          }}>
-            <span style={{ fontSize: 13, color: "rgba(167,139,250,0.6)" }}>
-              Replying to:{" "}
-              <span style={{ color: "#f0f0ff" }}>
-                {replyingTo.content?.substring(0, 55)}…
+        {/* Input area */}
+        <div className="chat-inputbar">
+          {sendError && (
+            <div className="send-error-bar">
+              <span>🔒 {sendError}</span>
+              <button onClick={() => setSendError("")} style={{ background: "none", border: "none", cursor: "pointer", color: "#fb7185", display: "flex" }}><X size={14} /></button>
+            </div>
+          )}
+
+          {typingText && (
+            <div className="typing-indicator">
+              <span style={{ display: "inline-flex", gap: 3 }}>
+                {[0, 1, 2].map(i => (
+                  <span key={i} className="typing-dot" style={{ animation: `typingDot 1.2s ${i * 0.2}s ease-in-out infinite` }} />
+                ))}
               </span>
-            </span>
-            <button
-              onClick={() => setReplyingTo(null)}
-              style={{ background: "none", border: "none", color: "#fb7185", fontSize: 18, cursor: "pointer", lineHeight: 1, paddingLeft: 10 }}
-            >
-              ✕
-            </button>
-          </div>
-        )}
+              {typingText} is typing…
+            </div>
+          )}
 
-        {/* Admin-only send banner for non-admins */}
-        {isGroup && activeRoom.onlyAdminCanSend && !canSend && (
-          <div style={{
-            textAlign: "center", fontSize: 13, color: "rgba(251,113,133,0.6)",
-            padding: "12px", background: "rgba(244,63,94,0.05)",
-            border: "1px solid rgba(244,63,94,0.15)", borderRadius: 12,
-          }}>
-            🔒 Only admins can send messages in this group
-          </div>
-        )}
+          {replyingTo && (
+            <div className="reply-preview">
+              <span style={{ fontSize: 13, color: "rgba(167,139,250,0.6)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                Replying to: <span style={{ color: "#f0f0ff" }}>{replyingTo.content?.substring(0, 55)}…</span>
+              </span>
+              <button onClick={() => setReplyingTo(null)} style={{ background: "none", border: "none", color: "#fb7185", fontSize: 18, cursor: "pointer", paddingLeft: 8, flexShrink: 0 }}>✕</button>
+            </div>
+          )}
 
-        {/* Input row */}
-        {canSend && (
-          <div style={{
-            display: "flex", alignItems: "center", gap: 12,
-            background: "rgba(24,24,48,1)",
-            border: "1px solid rgba(124,58,237,0.2)",
-            borderRadius: 18, padding: "10px 16px",
-            transition: "border-color 0.2s, box-shadow 0.2s",
-          }}
-            onFocusCapture={e => { e.currentTarget.style.borderColor = "rgba(124,58,237,0.55)"; e.currentTarget.style.boxShadow = "0 0 0 4px rgba(124,58,237,0.1)"; }}
-            onBlurCapture={e => { e.currentTarget.style.borderColor = "rgba(124,58,237,0.2)"; e.currentTarget.style.boxShadow = "none"; }}
-          >
-            <button
-              onClick={() => fileInputRef.current.click()}
-              disabled={uploading}
-              title="Attach file"
-              style={{
-                background: "none", border: "none", cursor: "pointer",
-                color: "rgba(167,139,250,0.45)", flexShrink: 0, padding: 4,
-                display: "flex", alignItems: "center", transition: "color 0.15s",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.color = "#a78bfa"; }}
-              onMouseLeave={e => { e.currentTarget.style.color = "rgba(167,139,250,0.45)"; }}
-            >
-              {uploading ? <span className="spinner" /> : <Paperclip size={20} />}
-            </button>
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*,video/*,*/*" className="file-input" />
+          {isGroup && activeRoom.onlyAdminCanSend && !canSend ? (
+            <div className="admin-only-notice">🔒 Only admins can send messages in this group</div>
+          ) : (
+            <div className="chat-inputbox">
+              {/* Attach button with popover */}
+              <div className="attach-popover-wrap" ref={attachWrapRef}>
+                <button
+                  className="chat-attach-btn"
+                  onClick={() => setShowAttachPopover(v => !v)}
+                  title="Attach"
+                  aria-label="Attach file"
+                >
+                  <Paperclip size={20} />
+                </button>
+                {showAttachPopover && (
+                  <AttachPopover
+                    onSelectMedia={() => { mediaRef.current.click(); setShowAttachPopover(false); }}
+                    onSelectFile={() => { fileRef.current.click(); setShowAttachPopover(false); }}
+                    onClose={() => setShowAttachPopover(false)}
+                  />
+                )}
+              </div>
 
-            <input
-              type="text"
-              value={text}
-              onChange={e => setText(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && sendMessage()}
-              placeholder="Type a message…"
-              style={{
-                flex: 1, background: "transparent", border: "none", outline: "none",
-                fontSize: 15, color: "#f0f0ff",
-              }}
-            />
-
-            <button
-              onClick={() => sendMessage()}
-              disabled={!text.trim()}
-              title="Send"
-              style={{
-                width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
-                background: text.trim()
-                  ? "linear-gradient(135deg,#7c3aed,#4f46e5)"
-                  : "rgba(124,58,237,0.15)",
-                border: "none", cursor: text.trim() ? "pointer" : "default",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "white", transition: "all 0.2s",
-                boxShadow: text.trim() ? "0 2px 14px rgba(124,58,237,0.5)" : "none",
-              }}
-              onMouseEnter={e => { if (text.trim()) { e.currentTarget.style.transform = "scale(1.1)"; e.currentTarget.style.boxShadow = "0 4px 22px rgba(124,58,237,0.65)"; } }}
-              onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = text.trim() ? "0 2px 14px rgba(124,58,237,0.5)" : "none"; }}
-            >
-              <Send size={16} />
-            </button>
-          </div>
-        )}
+              <AutoTextarea value={text} onChange={e => setText(e.target.value)} onKeyDown={handleKeyDown}
+                placeholder="Type a message… (Shift+Enter for new line)" disabled={sending} />
+              <button onClick={sendTextMessage} disabled={!canSendNow} title="Send"
+                className={`send-btn ${canSendNow ? "active" : "inactive"}`}>
+                {sending
+                  ? <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid white", animation: "spin 0.8s linear infinite" }} />
+                  : <Send size={16} />}
+              </button>
+            </div>
+          )}
+          <div className="chat-hint">Enter to send · Shift+Enter for new line</div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
-
-function GroupMenuItem({ icon, label, color = "#e0e0ff", onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        display: "flex", alignItems: "center", gap: 10,
-        width: "100%", padding: "11px 16px",
-        background: "none", border: "none", cursor: "pointer",
-        color, fontSize: 13, fontWeight: 500,
-        transition: "background 0.15s", textAlign: "left",
-        fontFamily: "'DM Sans', sans-serif",
-      }}
-      onMouseEnter={e => e.currentTarget.style.background = "rgba(124,58,237,0.1)"}
-      onMouseLeave={e => e.currentTarget.style.background = "none"}
-    >
-      {icon} {label}
-    </button>
-  );
-}
-
-const topbarBtn = (color, bg) => ({
-  display: "flex", alignItems: "center", gap: 6,
-  padding: "7px 12px", borderRadius: 9, cursor: "pointer",
-  background: bg,
-  border: `1px solid ${color}30`,
-  color: color, transition: "all 0.15s",
-});
