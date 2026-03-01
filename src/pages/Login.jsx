@@ -238,7 +238,7 @@ export default function Login() {
             {/* Footer link */}
             <p style={{ textAlign: "center", marginTop: 24, fontSize: 14, color: "rgba(167,139,250,0.5)" }}>
               Don't have an account?{" "}
-              <Link to="/login" style={{ color: "#a78bfa", fontWeight: 600, textDecoration: "none" }}>
+              <Link to="/signup" style={{ color: "#a78bfa", fontWeight: 600, textDecoration: "none" }}>
                 Create one →
               </Link>
             </p>

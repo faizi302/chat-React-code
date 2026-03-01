@@ -165,14 +165,19 @@ export default function Signup() {
         transform: mounted ? "translateY(0)" : "translateY(30px)",
         transition: "all 0.6s cubic-bezier(0.16,1,0.3,1)",
       }}>
-        <div style={{
-          background:"rgba(255,255,255,0.03)",
-          backdropFilter:"blur(20px)",
-          border:"1px solid rgba(124,58,237,0.2)",
-          borderRadius:26,
-          padding:"40px 36px",
-          boxShadow:"0 32px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)",
-        }}>
+<div style={{
+  background: "rgba(255,255,255,0.03)",
+  backdropFilter: "blur(20px)",
+  border: "1px solid rgba(124,58,237,0.2)",
+  borderRadius: 26,
+  padding: "40px 36px",
+  boxShadow: "0 32px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)",
+
+  // ── Add these three lines ───────────────────────────────
+  maxHeight: "85vh",               // or 82vh / 88vh — play with this value
+  overflowY: "auto",               // enables vertical scroll when needed
+  WebkitOverflowScrolling: "touch", // smooth scrolling on iOS
+}}>
 
           {/* Header */}
           <div style={{ textAlign:"center", marginBottom:28 }}>
