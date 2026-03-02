@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, LogOut, ChevronDown, Menu, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
 import AdminAvatar from "./AdminAvatar.jsx";
+import logo from "../assets/mk logo.png";
 
 export default function AdminNavbar() {
     const { logout, currentUser } = useAuth();
@@ -48,7 +49,7 @@ export default function AdminNavbar() {
             <div className="flex">
                 {/* Logo */}
                 <img
-                    src="src/assets/mk logo.png"
+                    src={logo}
                     alt="Logo"
                     style={{ height: 36, width: "auto", objectFit: "contain" }}
                 />
