@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, LogOut, ChevronDown, Menu, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
 import AdminAvatar from "./AdminAvatar.jsx";
-import logo from "../../assets/mk.png";
+import logo from "../../assets/mk logo.png";
 
 export default function AdminNavbar() {
     const { logout, currentUser } = useAuth();
