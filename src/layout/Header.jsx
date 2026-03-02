@@ -4,11 +4,19 @@ import { Menu, X, Plus, LogOut, Edit, ChevronDown, Shield } from "lucide-react";
 import logo from "../assets/mk logo.png";
 
 export default function Header({ currentUser, onJoinClick, onEditClick, onLogout, onToggleSidebar, sidebarOpen }) {
-  const [showMenu, setShowMenu]         = useState(false);
+  const [showMenu, setShowMenu]             = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [isMobile, setIsMobile]             = useState(window.innerWidth < 768);
   const navigate  = useNavigate();
   const menuRef   = useRef(null);
   const mobileRef = useRef(null);
+
+  // Track window width to show/hide New Group button
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Close desktop dropdown on outside click
   useEffect(() => {
@@ -49,15 +57,12 @@ export default function Header({ currentUser, onJoinClick, onEditClick, onLogout
       {/* Right — desktop: full controls */}
       <div className="header-right">
 
-        {/* New Group — desktop only, admin only
-            Wrapped in a desktopNav div so btn-new-group styles don't leak through */}
-        {isAdmin && (
-          <div className="desktopNav">
-            <button onClick={onJoinClick} className="btn-new-group">
-              <Plus size={16} />
-              <span>New Group</span>
-            </button>
-          </div>
+        {/* New Group — desktop only, admin only — hidden on mobile via JS state */}
+        {isAdmin && !isMobile && (
+          <button onClick={onJoinClick} className="btn-new-group">
+            <Plus size={16} />
+            <span>New Group</span>
+          </button>
         )}
 
         {/* Desktop user menu */}
