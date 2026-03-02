@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Users, Shield, UserCheck, MessageCircle } from "lucide-react";
+import { Users, Shield, UserCheck, MessageCircle, RefreshCw } from "lucide-react";
 import {
   getAllUsers, deleteUser, toggleUserStatus,
   getAllRooms, deleteRoom, clearRoomChat,
@@ -120,15 +120,6 @@ export default function AdminDashboard() {
     fontFamily: "'DM Sans', sans-serif",
   };
 
-  // ── Shared button styles ────────────────────────────────────────
-  const secondaryBtn = {
-    padding: "9px 16px", borderRadius: 10,
-    border: "1px solid rgba(124,58,237,0.3)",
-    background: "rgba(124,58,237,0.1)", color: "#a78bfa",
-    cursor: "pointer", fontSize: 13, fontWeight: 600,
-    fontFamily: "'DM Sans',sans-serif",
-  };
-
   return (
     <div style={{ minHeight: "100vh", background: "#09091a", fontFamily: "'DM Sans', sans-serif" }}>
 
@@ -235,9 +226,20 @@ export default function AdminDashboard() {
               />
               <button
                 onClick={() => activeTab === "users" ? fetchUsers() : fetchGroups()}
-                style={secondaryBtn}
+                title="Refresh"
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "#a78bfa",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: 4,
+                  flexShrink: 0,
+                }}
               >
-                ↻ Refresh
+                <RefreshCw size={16} />
               </button>
             </div>
           </div>

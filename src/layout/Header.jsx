@@ -135,6 +135,7 @@ export default function Header({ currentUser, onJoinClick, onEditClick, onLogout
                     {isAdmin && <span className="badge-admin" style={{ marginTop: 4, display: "inline-block" }}>ADMIN</span>}
                   </div>
 
+                  {/* New Group — mobile only, admin only */}
                   {isAdmin && (
                     <button className="dropdown-item" style={{ color: "#a78bfa" }}
                       onClick={() => { onJoinClick(); setShowMobileMenu(false); }}>
