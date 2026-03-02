@@ -49,12 +49,15 @@ export default function Header({ currentUser, onJoinClick, onEditClick, onLogout
       {/* Right — desktop: full controls */}
       <div className="header-right">
 
-        {/* New Group — desktop only, admin only */}
+        {/* New Group — desktop only, admin only
+            Wrapped in a desktopNav div so btn-new-group styles don't leak through */}
         {isAdmin && (
-          <button onClick={onJoinClick} className="btn-new-group desktopNav">
-            <Plus size={16} />
-            <span>New Group</span>
-          </button>
+          <div className="desktopNav">
+            <button onClick={onJoinClick} className="btn-new-group">
+              <Plus size={16} />
+              <span>New Group</span>
+            </button>
+          </div>
         )}
 
         {/* Desktop user menu */}
@@ -97,7 +100,7 @@ export default function Header({ currentUser, onJoinClick, onEditClick, onLogout
           </div>
         )}
 
-        {/* Mobile hamburger (3 dots / menu icon) */}
+        {/* Mobile hamburger */}
         {currentUser && (
           <div style={{ position: "relative" }} className="mobileMenuBtn" ref={mobileRef}>
             <button
@@ -117,9 +120,7 @@ export default function Header({ currentUser, onJoinClick, onEditClick, onLogout
               <>
                 {/* Overlay to close on outside tap */}
                 <div
-                  style={{
-                    position: "fixed", inset: 0, zIndex: 48,
-                  }}
+                  style={{ position: "fixed", inset: 0, zIndex: 48 }}
                   onClick={() => setShowMobileMenu(false)}
                 />
                 {/* Dropdown */}
@@ -135,7 +136,7 @@ export default function Header({ currentUser, onJoinClick, onEditClick, onLogout
                     {isAdmin && <span className="badge-admin" style={{ marginTop: 4, display: "inline-block" }}>ADMIN</span>}
                   </div>
 
-                  {/* New Group — mobile only, admin only */}
+                  {/* New Group — mobile menu only, admin only */}
                   {isAdmin && (
                     <button className="dropdown-item" style={{ color: "#a78bfa" }}
                       onClick={() => { onJoinClick(); setShowMobileMenu(false); }}>
